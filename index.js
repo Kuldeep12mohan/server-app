@@ -13,6 +13,8 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+const PORT = process.env.PORT;
+
 app.use(
   cors({
     origin: "http://localhost:5173", // frontend URL
@@ -66,10 +68,10 @@ app.post("/auth/logout", (req, res) => {
   res.clearCookie("session", {
     httpOnly: true,
     sameSite: "strict",
-    secure: false, // true in production
+    secure: true, // true in production
   });
   res.json({ success: true, message: "Logged out successfully 💖" });
 });
 
 app.use("/questions",questionRouter);
-app.listen(5000, () => console.log("🚀 Server running on http://localhost:5000"));
+app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
