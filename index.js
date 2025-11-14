@@ -18,12 +18,14 @@ app.use(express.json());
 app.use(cookieParser());
 
 // ✅ CORS setup
+console.log(CLIENT_URL)
 app.use(
   cors({
-    origin: CLIENT_URL, // your frontend URL in production
-    credentials: true,  // allow sending cookies
+    origin: CLIENT_URL, 
+    credentials: true, 
   })
 );
+
 
 // Secrets
 const SECRET_HE = process.env.HE_PASSWORD;
