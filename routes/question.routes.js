@@ -5,7 +5,6 @@ import { Question } from "../models/questions.model.js";
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
-// 🧠 Middleware to verify session
 function verifySession(req, res, next) {
   const token = req.cookies.session;
   if (!token)
