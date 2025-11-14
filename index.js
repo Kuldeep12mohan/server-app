@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken";
 import connectDB from "./db/db.js";
 import questionRouter from "./routes/question.routes.js";
 import rateLimit from "express-rate-limit";
+import moodRouter from "./routes/mood.routes.js";
+
 
 dotenv.config();
 await connectDB();
@@ -89,7 +91,7 @@ app.post("/auth/logout", (req, res) => {
 });
 
 app.use("/questions", questionRouter);
-
+app.use("/mood", moodRouter);
 app.listen(PORT, () =>
   console.log(`🚀 Server running on http://localhost:${PORT}`)
 );
