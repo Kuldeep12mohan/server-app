@@ -104,35 +104,34 @@ app.use("/mood", moodRouter);
 const httpServer = http.createServer(app);
 
 const io = new IOServer(httpServer, {
-  cors: {
-    origin: CLIENT_URL,
-    credentials: true,
-  },
+  cors: { origin: CLIENT_URL, credentials: true }
 });
 
-// ---------- In-memory games store & helpers ----------
+// ========== GAME STORE ==========
 const games = new Map();
 
-function createNewGame(id, starterRole = "he") {
+// Create new game
+function createGame(roomId, starter = "he") {
   return {
-    id,
+    id: roomId,
     board: Array(9).fill(null),
-    currentTurn: starterRole,                   // who would play if move allowed
-    chooser: starterRole === "he" ? "she" : "he", // who chooses the ball
+    currentTurn: starter,                  // Who will guess + potentially move
+    chooser: starter === "he" ? "she" : "he", // Opposite person chooses ball
     chosenBall: null,
     moveAllowed: false,
-    players: {}, // { he: socketId, she: socketId }
-    winner: null,
+    players: {},                          // { he: socketId, she: socketId }
+    winner: null
   };
 }
 
+// Check for win/draw
 function checkWinner(board) {
-  const lines = [
+  const wins = [
     [0,1,2],[3,4,5],[6,7,8],
     [0,3,6],[1,4,7],[2,5,8],
     [0,4,8],[2,4,6]
   ];
-  for (const [a,b,c] of lines) {
+  for (const [a,b,c] of wins) {
     if (board[a] && board[a] === board[b] && board[a] === board[c]) {
       return board[a] === "X" ? "he" : "she";
     }
@@ -141,160 +140,165 @@ function checkWinner(board) {
   return null;
 }
 
-// simple cookie parser helper for socket (no external dep)
-function parseCookies(cookieHeader = "") {
-  const cookies = {};
-  cookieHeader.split(";").forEach((c) => {
-    const [rawName, ...rest] = c.trim().split("=");
-    if (!rawName) return;
-    const rawVal = rest.join("=");
-    try {
-      cookies[rawName] = decodeURIComponent(rawVal);
-    } catch (e) {
-      cookies[rawName] = rawVal;
-    }
+// Parse cookies from socket handshake
+function parseCookies(str = "") {
+  const obj = {};
+  str.split(";").forEach((c) => {
+    const [k, v] = c.trim().split("=");
+    if (k && v) obj[k] = decodeURIComponent(v);
   });
-  return cookies;
+  return obj;
 }
 
-// ---------- Socket handlers ----------
+// ========== SOCKET.IO HANDLERS ==========
 io.on("connection", (socket) => {
-  // Attempt to decode JWT from cookies (for role)
-  const cookieHeader = socket.handshake.headers?.cookie || "";
-  const cookies = parseCookies(cookieHeader);
-  let socketRole = null;
-  if (cookies.session) {
-    try {
+
+  // Extract role from JWT cookie if present
+  let roleFromCookie = null;
+  try {
+    const cookies = parseCookies(socket.handshake.headers.cookie);
+    if (cookies.session) {
       const decoded = jwt.verify(cookies.session, JWT_SECRET);
-      socketRole = decoded.role;
-    } catch (e) {
-      // invalid token — leave socketRole null, client can still send role but less trust
+      roleFromCookie = decoded.role;
     }
-  }
+  } catch {}
 
-  socket.data.roleFromCookie = socketRole; // may be null
-  // console.log("socket connected", socket.id, "roleFromCookie", socketRole);
+  socket.data.role = roleFromCookie;
 
+  // ---------- JOIN ROOM ----------
   socket.on("join_room", ({ roomId, role }, cb) => {
-    if (!roomId || !["he","she"].includes(role)) {
-      return cb && cb({ success: false, message: "Invalid params" });
+    if (!["he", "she"].includes(role)) {
+      return cb && cb({ success: false, message: "Invalid role" });
     }
 
-    // optional: enforce cookie-derived role matches claimed role
-    if (socketRole && socketRole !== role) {
-      // don't let mismatched claim go through
+    // If cookie-role exists → enforce it
+    if (roleFromCookie && role !== roleFromCookie) {
       return cb && cb({ success: false, message: "Role mismatch with session" });
     }
 
     if (!games.has(roomId)) {
-      games.set(roomId, createNewGame(roomId, "he"));
+      games.set(roomId, createGame(roomId));
     }
 
     const game = games.get(roomId);
+
     game.players[role] = socket.id;
     socket.join(roomId);
 
-    // send full state to all in room
-    io.to(roomId).emit("game_state", { game });
+    cb && cb({ success: true, game });
 
-    return cb && cb({ success: true, game });
+    io.to(roomId).emit("game_state", { game });
   });
 
+  // ---------- CHOOSE BALL ----------
   socket.on("choose_ball", ({ roomId, role, color }, cb) => {
     const game = games.get(roomId);
-    if (!game) return cb && cb({ success: false, message: "No game" });
+    if (!game) return cb && cb({ success: false });
 
-    // enforce chooser
-    if (role !== game.chooser) return cb && cb({ success: false, message: "Not allowed to choose" });
-    if (!["green","red","blue"].includes(color)) return cb && cb({ success: false, message: "Invalid color" });
+    if (role !== game.chooser) {
+      return cb && cb({ success: false, message: "Not chooser" });
+    }
+
+    if (!["green", "red", "blue"].includes(color)) {
+      return cb && cb({ success: false, message: "Invalid color" });
+    }
 
     game.chosenBall = color;
-    // notify: chooser picked (not revealing choice)
-    io.to(roomId).emit("ball_chosen", {
-      chooser: role,
-      chosen: true,
-      msg: `${role} chose a ball (hidden).`
-    });
+    game.moveAllowed = false;
+
+    io.to(roomId).emit("ball_chosen", { chooser: role });
 
     io.to(roomId).emit("game_state", { game });
-    return cb && cb({ success: true });
+
+    cb && cb({ success: true });
   });
 
+  // ---------- GUESS BALL ----------
   socket.on("guess_ball", ({ roomId, role, color }, cb) => {
     const game = games.get(roomId);
-    if (!game) return cb && cb({ success: false, message: "No game" });
+    if (!game) return cb && cb({ success: false });
 
-    // only currentTurn may guess
-    if (role !== game.currentTurn) return cb && cb({ success: false, message: "Not your turn to guess" });
-    if (!game.chosenBall) return cb && cb({ success: false, message: "Chooser hasn't selected" });
+    if (role !== game.currentTurn) {
+      return cb && cb({ success: false, message: "Not your guess turn" });
+    }
+
+    if (!game.chosenBall) {
+      return cb && cb({ success: false, message: "Chooser has not selected yet" });
+    }
 
     const correct = game.chosenBall === color;
 
     if (correct) {
       game.moveAllowed = true;
-      io.to(roomId).emit("guess_result", { correct: true, by: role, msg: "Guess correct — you may move!" });
     } else {
-      // wrong: switch turn and chooser
+      // Incorrect guess → turn switches
       game.currentTurn = game.currentTurn === "he" ? "she" : "he";
       game.chooser = game.currentTurn === "he" ? "she" : "he";
       game.moveAllowed = false;
-      io.to(roomId).emit("guess_result", { correct: false, by: role, msg: "Wrong guess — turn skipped." });
     }
 
-    // always reset chosenBall after guess is processed
     game.chosenBall = null;
 
+    io.to(roomId).emit("guess_result", { correct });
     io.to(roomId).emit("game_state", { game });
-    return cb && cb({ success: true, correct });
+
+    cb && cb({ success: true, correct });
   });
 
+  // ---------- MAKE MOVE ----------
   socket.on("make_move", ({ roomId, role, index }, cb) => {
     const game = games.get(roomId);
-    if (!game) return cb && cb({ success: false, message: "No game" });
+    if (!game) return cb && cb({ success: false });
 
-    if (!game.moveAllowed) return cb && cb({ success: false, message: "Move not allowed now" });
-    if (role !== game.currentTurn) return cb && cb({ success: false, message: "Not your move" });
-    if (typeof index !== "number" || index < 0 || index > 8) return cb && cb({ success: false, message: "Invalid cell" });
-    if (game.board[index]) return cb && cb({ success: false, message: "Cell already filled" });
+    if (!game.moveAllowed)
+      return cb && cb({ success: false, message: "Move not allowed" });
+
+    if (role !== game.currentTurn)
+      return cb && cb({ success: false, message: "Not your move" });
+
+    if (index < 0 || index > 8)
+      return cb && cb({ success: false, message: "Bad index" });
+
+    if (game.board[index])
+      return cb && cb({ success: false, message: "Cell filled" });
 
     game.board[index] = role === "he" ? "X" : "O";
     game.moveAllowed = false;
 
-    // check winner
+    // check win
     const winner = checkWinner(game.board);
     if (winner) {
       game.winner = winner;
-      io.to(roomId).emit("game_over", { winner, game });
     } else {
-      // swap turns + chooser
       game.currentTurn = game.currentTurn === "he" ? "she" : "he";
       game.chooser = game.currentTurn === "he" ? "she" : "he";
-      io.to(roomId).emit("game_update", { game });
     }
 
-    return cb && cb({ success: true });
+    io.to(roomId).emit("game_state", { game });
+
+    cb && cb({ success: true });
   });
 
+  // ---------- RESET ----------
   socket.on("reset_game", ({ roomId }, cb) => {
-    if (!roomId) return cb && cb({ success: false });
-    const newGame = createNewGame(roomId, "he");
-    games.set(roomId, newGame);
-    io.to(roomId).emit("game_state", { game: newGame });
-    return cb && cb({ success: true });
+    const fresh = createGame(roomId);
+    games.set(roomId, fresh);
+    io.to(roomId).emit("game_state", { game: fresh });
+    cb && cb({ success: true });
   });
 
-  socket.on("leave_room", ({ roomId, role }, cb) => {
+  // ---------- LEAVE ----------
+  socket.on("leave_room", ({ roomId, role }) => {
     const game = games.get(roomId);
     if (game) {
       delete game.players[role];
       socket.leave(roomId);
       io.to(roomId).emit("game_state", { game });
     }
-    return cb && cb({ success: true });
   });
 
+  // ---------- DISCONNECT ----------
   socket.on("disconnect", () => {
-    // remove player references from games
     for (const [roomId, game] of games.entries()) {
       for (const [r, sid] of Object.entries(game.players)) {
         if (sid === socket.id) {
@@ -306,5 +310,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// ---------- Start server ----------
-httpServer.listen(PORT, () => console.log(`🚀 Server + Socket running on http://localhost:${PORT}`));
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server + Socket running on port ${PORT}`);
+});
