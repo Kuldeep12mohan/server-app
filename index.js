@@ -10,6 +10,7 @@ import { initializeSocketServer } from "./socket/socketServer.js";
 import config from "./config/config.js";
 
 dotenv.config();
+//h
 await connectDB();
 
 const app = express();
