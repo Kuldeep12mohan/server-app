@@ -2,7 +2,7 @@ import http from "http";
 import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./db/db.js";
-import { setupMiddleware } from "./middleware/ratelimiter.middleware.js";
+import { setupMiddleware } from "./middleware/rateLimiter.middleware.js";
 import authRouter from "./routes/auth.routes.js";
 import questionRouter from "./routes/question.routes.js";
 import moodRouter from "./routes/mood.routes.js";

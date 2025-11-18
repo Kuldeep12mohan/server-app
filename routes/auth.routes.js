@@ -1,7 +1,7 @@
 import { Router } from "express";
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
-import { authLimiter } from "../middleware/ratelimiter.middleware.js";
+import { authLimiter } from "../middleware/rateLimiter.middleware.js";
 
 const router = Router();
 
