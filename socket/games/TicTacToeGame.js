@@ -8,11 +8,18 @@ export class TicTacToeGame extends BaseGame {
     this.chooser = starter === "he" ? "she" : "he";
     this.chosenBall = null;
     this.moveAllowed = false;
+    this.winner = null;
   }
+
 
   chooseBall(color) {
     if (!["green", "red", "blue"].includes(color)) {
       return { success: false, message: "Invalid color" };
+    }
+    if (this.chosenBall) {
+      // Already chosen, maybe allow re-choose if game hasn't progressed?
+      // For now, strict.
+      return { success: false, message: "Ball already chosen" };
     }
     this.chosenBall = color;
     this.moveAllowed = false;
@@ -23,6 +30,9 @@ export class TicTacToeGame extends BaseGame {
     if (!this.chosenBall) {
       return { success: false, message: "No ball chosen yet" };
     }
+    if (this.moveAllowed) {
+      return { success: false, message: "Already guessed correctly, make your move!" };
+    }
 
     const correct = this.chosenBall === color;
 
@@ -32,15 +42,25 @@ export class TicTacToeGame extends BaseGame {
       // Wrong guess - switch turns
       this.switchTurns();
       this.moveAllowed = false;
+      // Reset chosen ball so next player can choose?
+      // The logic seems to be: Chooser picks -> Guesser guesses.
+      // If wrong, turns switch. So new Chooser picks?
+      // If so, we need to reset chosenBall.
+      this.chosenBall = null;
     }
 
-    this.chosenBall = null;
+    // If correct, we keep chosenBall so we know? Or maybe reset it?
+    // If correct, moveAllowed becomes true. Then they make a move.
+    // After move, turns switch.
+    // So if correct, we can clear chosenBall immediately or after move.
+    // Let's clear it after move.
+
     return { success: true, correct };
   }
 
   makeMove(role, index) {
     if (!this.moveAllowed) {
-      return { success: false, message: "Move not allowed" };
+      return { success: false, message: "Move not allowed. Guess the ball first!" };
     }
 
     if (role !== this.currentTurn) {
@@ -57,6 +77,7 @@ export class TicTacToeGame extends BaseGame {
 
     this.board[index] = role === "he" ? "X" : "O";
     this.moveAllowed = false;
+    this.chosenBall = null; // Reset chosen ball after move
 
     const winner = this.checkWinner();
     if (winner) {
@@ -101,12 +122,16 @@ export class TicTacToeGame extends BaseGame {
 
   toJSON() {
     return {
-      ...super.toJSON(),
+      id: this.id,
+      gameType: this.gameType,
+      players: this.players,
       board: this.board,
       currentTurn: this.currentTurn,
       chooser: this.chooser,
       chosenBall: this.chosenBall,
       moveAllowed: this.moveAllowed,
+      winner: this.winner,
     };
   }
+
 }

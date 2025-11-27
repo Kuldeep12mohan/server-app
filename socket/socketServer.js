@@ -10,7 +10,6 @@ export function initializeSocketServer(httpServer) {
   });
 
   io.on("connection", (socket) => {
-    // Extract role from cookie
     let roleFromCookie = null;
     try {
       const cookies = parseCookies(socket.handshake.headers.cookie);
@@ -21,8 +20,6 @@ export function initializeSocketServer(httpServer) {
     } catch {}
 
     socket.data.role = roleFromCookie;
-
-    // Register all game-related event handlers
     registerGameHandlers(io, socket);
   });
 

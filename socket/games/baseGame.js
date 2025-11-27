@@ -2,8 +2,10 @@ export class BaseGame {
   constructor(roomId, gameType) {
     this.id = roomId;
     this.gameType = gameType;
-    this.players = {};
+    this.players = {};       // { he: socketId, she: socketId }
     this.winner = null;
+
+    this.state = {};         // 👈 central game-state container
   }
 
   addPlayer(role, socketId) {
@@ -18,8 +20,14 @@ export class BaseGame {
     return !!this.players[role];
   }
 
+  // Subclasses should override this
   reset() {
     throw new Error("reset() must be implemented by subclass");
+  }
+
+  // Universal state update method
+  updateState(newState) {
+    this.state = { ...this.state, ...newState };
   }
 
   toJSON() {
@@ -28,6 +36,7 @@ export class BaseGame {
       gameType: this.gameType,
       players: this.players,
       winner: this.winner,
+      state: this.state,     // 👈 send the entire game state to frontend
     };
   }
 }

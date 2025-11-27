@@ -1,4 +1,5 @@
 import { TicTacToeGame } from "./TicTacToeGame.js";
+import { PuzzleGame } from "./PuzzleGame.js";
 
 class GameManager {
   constructor() {
@@ -7,15 +8,16 @@ class GameManager {
 
   createGame(roomId, gameType = "tictactoe", options = {}) {
     let game;
-    
+
     switch (gameType) {
       case "tictactoe":
         game = new TicTacToeGame(roomId, options.starter);
         break;
-      // Add more game types here:
-      // case "chess":
-      //   game = new ChessGame(roomId, options);
-      //   break;
+
+      case "puzzle":
+        game = new PuzzleGame(roomId, options);
+        break;
+
       default:
         throw new Error(`Unknown game type: ${gameType}`);
     }
