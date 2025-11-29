@@ -162,6 +162,24 @@ export function registerGameHandlers(io, socket) {
 
 
   /* ============================================================
+   * NUMBER GUESSING GAME HANDLERS
+   * ============================================================ */
+  socket.on("number_guess_make", ({ roomId, role, guess }, cb) => {
+    const game = gameManager.getGame(roomId);
+
+    if (!game?.makeGuess) {
+      return cb?.({ success: false, message: "Not a Number Guessing game" });
+    }
+
+    const result = game.makeGuess(role, guess);
+    if (!result.success) return cb?.(result);
+
+    io.to(roomId).emit("game_state", { game: game.toJSON() });
+    cb?.({ success: true });
+  });
+
+
+  /* ============================================================
    * RESET GAME (any type)
    * ============================================================ */
   socket.on("reset_game", ({ roomId }, cb) => {
@@ -179,7 +197,7 @@ export function registerGameHandlers(io, socket) {
    * SWITCH GAME TYPE
    * ============================================================ */
   socket.on("switch_game", ({ roomId, gameType }, cb) => {
-    if (!["tictactoe", "puzzle"].includes(gameType)) {
+    if (!["tictactoe", "puzzle", "numberguess"].includes(gameType)) {
       return cb?.({ success: false, message: "Invalid game type" });
     }
 

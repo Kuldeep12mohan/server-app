@@ -1,5 +1,6 @@
 import { TicTacToeGame } from "./TicTacToeGame.js";
 import { PuzzleGame } from "./PuzzleGame.js";
+import { NumberGuessingGame } from "./NumberGuessingGame.js";
 
 class GameManager {
   constructor() {
@@ -16,6 +17,10 @@ class GameManager {
 
       case "puzzle":
         game = new PuzzleGame(roomId, options);
+        break;
+
+      case "numberguess":
+        game = new NumberGuessingGame(roomId);
         break;
 
       default:
