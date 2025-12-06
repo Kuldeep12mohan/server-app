@@ -223,9 +223,18 @@ export function registerGameHandlers(io, socket) {
       return cb?.({ success: false, message: "Invalid game type" });
     }
 
+    // Preserve players from the old game if it exists
+    const oldGame = gameManager.getGame(roomId);
+    const currentPlayers = oldGame ? oldGame.players : {};
+
     // Force create/overwrite game
     gameManager.createGame(roomId, gameType);
     const game = gameManager.getGame(roomId);
+
+    // Restore players
+    if (game) {
+      game.players = currentPlayers;
+    }
 
     io.to(roomId).emit("game_state", { game: game.toJSON() });
     cb?.({ success: true });
