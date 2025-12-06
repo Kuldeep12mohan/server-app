@@ -14,7 +14,7 @@ export class CoopDiceGame extends BaseGame {
                 she: { pos: { x: 0, y: 0 }, currentRoll: null, frozen: false, bonuses: [] },
             },
             currentTurn: "he",
-            turnsLeft: 30, // Reset to 30 for balanced gameplay on 6x6 grid
+            turnsLeft: 10, // Reset to 30 for balanced gameplay on 6x6 grid
             gameStatus: "playing", // playing, won, lost
             activePuzzle: null,
             logs: ["Welcome to the Jungle Playground! �"],
