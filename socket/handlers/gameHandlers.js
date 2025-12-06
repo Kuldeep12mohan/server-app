@@ -180,6 +180,28 @@ export function registerGameHandlers(io, socket) {
 
 
   /* ============================================================
+   * COOP DICE GAME HANDLERS
+   * ============================================================ */
+  socket.on("game_action", ({ roomId, action, role, ...payload }, cb) => {
+    const game = gameManager.getGame(roomId);
+    if (game?.gameType !== "coopdice") {
+      return cb?.({ success: false, message: "Not a Coop Dice game" });
+    }
+
+    // Delegate to the game instance's handleAction method
+    if (game.handleAction) {
+      game.handleAction(action, { role, ...payload });
+    } else {
+      // Fallback for games that don't implement handleAction (shouldn't happen for CoopDice)
+      console.warn(`Game ${gameType} does not implement handleAction`);
+      return cb?.({ success: false, message: "Game does not support actions" });
+    }
+
+    io.to(roomId).emit("game_state", { game: game.toJSON() });
+    cb?.({ success: true });
+  });
+
+  /* ============================================================
    * RESET GAME (any type)
    * ============================================================ */
   socket.on("reset_game", ({ roomId }, cb) => {
@@ -197,7 +219,7 @@ export function registerGameHandlers(io, socket) {
    * SWITCH GAME TYPE
    * ============================================================ */
   socket.on("switch_game", ({ roomId, gameType }, cb) => {
-    if (!["tictactoe", "puzzle", "numberguess"].includes(gameType)) {
+    if (!["tictactoe", "puzzle", "numberguess", "coopdice"].includes(gameType)) {
       return cb?.({ success: false, message: "Invalid game type" });
     }
 
