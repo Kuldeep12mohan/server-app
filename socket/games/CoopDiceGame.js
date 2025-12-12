@@ -1,14 +1,17 @@
 import { BaseGame } from "./baseGame.js";
-
 export class CoopDiceGame extends BaseGame {
     constructor(roomId, options = {}) {
         super(roomId, "coopdice");
-        this.reset();
+        // this.reset() is now called via init()
     }
 
-    reset() {
+    async init() {
+        await this.reset();
+    }
+
+    async reset() {
         this.state = {
-            board: this.generateBoard(),
+            board: await this.generateBoard(),
             players: {
                 he: { pos: { x: 0, y: 0 }, currentRoll: null, frozen: false, bonuses: [] },
                 she: { pos: { x: 0, y: 0 }, currentRoll: null, frozen: false, bonuses: [] },
@@ -17,12 +20,12 @@ export class CoopDiceGame extends BaseGame {
             turnsLeft: 10, // Reset to 30 for balanced gameplay on 6x6 grid
             gameStatus: "playing", // playing, won, lost
             activePuzzle: null,
-            logs: ["Welcome to the Jungle Playground! �"],
+            logs: ["Welcome to the Jungle Playground! 🌴"],
         };
         this.winner = null;
     }
 
-    generateBoard() {
+    async generateBoard() {
         // 6x6 Grid = 36 Tiles
         // 0,0 is Start (Index 0). 5,5 is End (Index 35).
         const tiles = [];
@@ -38,35 +41,61 @@ export class CoopDiceGame extends BaseGame {
         }
 
         // Pool of all content
-        const allPuzzles = [
-            // Riddles
-            { q: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", a: "echo" },
-            { q: "The more of this there is, the less you see. What is it?", a: "darkness" },
-            { q: "I have keys but no locks. I have a space but no room. You can enter, but can’t go outside. What am I?", a: "keyboard" },
-            { q: "What has to be broken before you can use it?", a: "egg" },
-            { q: "I’m tall when I’m young, and I’m short when I’m old. What am I?", a: "candle" },
-            { q: "What comes once in a minute, twice in a moment, but never in a thousand years?", a: "m" },
-            { q: "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?", a: "fire" },
-            { q: "What has many keys but can't open a single lock?", a: "piano" },
-            { q: "What has a head and a tail but no body?", a: "coin" },
-            { q: "What gets wetter as it dries?", a: "towel" },
+        const allPuzzles = [];
+        const targetCount = 15;
+        let attempts = 0;
+        const maxAttempts = 50; // Prevent infinite loop if API fails or is slow
 
-            // Math
-            { q: "Math: lim(x→3) (x² - 9) / (x - 3) = ?", a: "6" },
-            { q: "Math: ∫(0 to 2) 3x² dx = ?", a: "8" },
-            { q: "Math: log₂(32) = ?", a: "5" },
-            { q: "Math: If f(x) = 2x + 1, what is f(3)?", a: "7" },
-            { q: "Math: d/dx (sin x) at x=0. (cos 0) = ?", a: "1" },
-            { q: "Math: √64 = ?", a: "8" },
-            { q: "Math: 2³ = ?", a: "8" },
-            { q: "Math: d/dx (x²) at x=3 = ?", a: "6" },
-            { q: "Math: lim(x→∞) (4x + 1)/(x - 2) = ?", a: "4" },
-            { q: "Math: 5! / 4! = ?", a: "5" },
-            { q: "Math: sin(90°) = ?", a: "1" },
-            { q: "Math: 7 mod 4 = ?", a: "3" },
-            { q: "Math: | -9 | = ?", a: "9" },
-            { q: "Math: 3² - 2³ = ?", a: "1" }
-        ];
+        while (allPuzzles.length < targetCount && attempts < maxAttempts) {
+            attempts++;
+            try {
+                const res = await fetch("https://riddles-api.vercel.app/random");
+                const data = await res.json();
+
+                if (data && data.riddle && data.answer) {
+                    const answer = data.answer.trim();
+                    // Check if answer is one word (no spaces)
+                    if (!answer.includes(" ")) {
+                        // Avoid duplicates
+                        const exists = allPuzzles.some(p => p.q === data.riddle);
+                        if (!exists) {
+                            allPuzzles.push({ q: data.riddle, a: answer.toLowerCase() });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch API riddle:", err);
+                // If API fails, we might break or continue to try a few more times
+            }
+        }
+
+        // Fallback if we couldn't fetch enough
+        if (allPuzzles.length < targetCount) {
+            const backups = [
+                { q: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", a: "echo" },
+                { q: "The more of this there is, the less you see. What is it?", a: "darkness" },
+                { q: "I have keys but no locks. I have a space but no room. You can enter, but can’t go outside. What am I?", a: "keyboard" },
+                { q: "What has to be broken before you can use it?", a: "egg" },
+                { q: "I’m tall when I’m young, and I’m short when I’m old. What am I?", a: "candle" },
+                { q: "What comes once in a minute, twice in a moment, but never in a thousand years?", a: "m" },
+                { q: "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?", a: "fire" },
+                { q: "What has many keys but can't open a single lock?", a: "piano" },
+                { q: "What has a head and a tail but no body?", a: "coin" },
+                { q: "What gets wetter as it dries?", a: "towel" },
+                { q: "Math: lim(x→3) (x² - 9) / (x - 3) = ?", a: "6" },
+                { q: "Math: ∫(0 to 2) 3x² dx = ?", a: "8" },
+                { q: "Math: log₂(32) = ?", a: "5" },
+                { q: "Math: If f(x) = 2x + 1, what is f(3)?", a: "7" },
+                { q: "Math: d/dx (sin x) at x=0. (cos 0) = ?", a: "1" }
+            ];
+
+            for (const backup of backups) {
+                if (allPuzzles.length >= targetCount) break;
+                if (!allPuzzles.some(p => p.q === backup.q)) {
+                    allPuzzles.push(backup);
+                }
+            }
+        }
 
         const monsters = [
             "Swamp Beast 👹", "Venomous Snake 🐍", "Giant Spider 🕷️", "Ancient Treant 🌳",
@@ -82,7 +111,7 @@ export class CoopDiceGame extends BaseGame {
         // Select random spots for puzzles (avoid Start 0,0 and End 5,5)
         // Start is index 0. End is index 35.
         const puzzleIndices = new Set();
-        while (puzzleIndices.size < 15) { // Increase density for playground
+        while (puzzleIndices.size < allPuzzles.length) {
             const idx = Math.floor(Math.random() * 34) + 1; // 1 to 34
             puzzleIndices.add(idx);
         }

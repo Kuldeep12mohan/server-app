@@ -8,7 +8,7 @@ class GameManager {
     this.games = new Map();
   }
 
-  createGame(roomId, gameType = "tictactoe", options = {}) {
+  async createGame(roomId, gameType = "tictactoe", options = {}) {
     let game;
 
     switch (gameType) {
@@ -30,6 +30,10 @@ class GameManager {
 
       default:
         throw new Error(`Unknown game type: ${gameType}`);
+    }
+
+    if (game.init) {
+      await game.init();
     }
 
     this.games.set(roomId, game);

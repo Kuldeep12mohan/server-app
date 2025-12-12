@@ -5,7 +5,7 @@ export function registerGameHandlers(io, socket) {
   /* ----------------------------------------------
    * JOIN ROOM (Common for all game types)
    * ---------------------------------------------- */
-  socket.on("join_room", ({ roomId, role, gameType = "tictactoe" }, cb) => {
+  socket.on("join_room", async ({ roomId, role, gameType = "tictactoe" }, cb) => {
     try {
       if (!["he", "she"].includes(role)) {
         return cb?.({ success: false, message: "Invalid role" });
@@ -18,7 +18,7 @@ export function registerGameHandlers(io, socket) {
 
       // Create game if not exists
       if (!gameManager.hasGame(roomId)) {
-        gameManager.createGame(roomId, gameType);
+        await gameManager.createGame(roomId, gameType);
       }
 
       const game = gameManager.getGame(roomId);
@@ -193,7 +193,7 @@ export function registerGameHandlers(io, socket) {
       game.handleAction(action, { role, ...payload });
     } else {
       // Fallback for games that don't implement handleAction (shouldn't happen for CoopDice)
-      console.warn(`Game ${gameType} does not implement handleAction`);
+      console.warn(`Game ${game.gameType} does not implement handleAction`);
       return cb?.({ success: false, message: "Game does not support actions" });
     }
 
@@ -218,7 +218,7 @@ export function registerGameHandlers(io, socket) {
   /* ============================================================
    * SWITCH GAME TYPE
    * ============================================================ */
-  socket.on("switch_game", ({ roomId, gameType }, cb) => {
+  socket.on("switch_game", async ({ roomId, gameType }, cb) => {
     if (!["tictactoe", "puzzle", "numberguess", "coopdice"].includes(gameType)) {
       return cb?.({ success: false, message: "Invalid game type" });
     }
@@ -228,7 +228,7 @@ export function registerGameHandlers(io, socket) {
     const currentPlayers = oldGame ? oldGame.players : {};
 
     // Force create/overwrite game
-    gameManager.createGame(roomId, gameType);
+    await gameManager.createGame(roomId, gameType);
     const game = gameManager.getGame(roomId);
 
     // Restore players
