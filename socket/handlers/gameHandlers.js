@@ -31,7 +31,7 @@ export function registerGameHandlers(io, socket) {
 
     } catch (err) {
       console.error("Error in join_room:", err);
-      cb?.({ success: false, message: "Internal server error during join" });
+      cb?.({ success: false, message: err.message || "Internal server error during join" });
     }
   });
 
@@ -204,12 +204,12 @@ export function registerGameHandlers(io, socket) {
   /* ============================================================
    * RESET GAME (any type)
    * ============================================================ */
-  socket.on("reset_game", ({ roomId }, cb) => {
+  socket.on("reset_game", async ({ roomId }, cb) => {
     const game = gameManager.getGame(roomId);
 
     if (!game) return cb?.({ success: false, message: "Game not found" });
 
-    game.reset();
+    await game.reset();
     io.to(roomId).emit("game_state", { game: game.toJSON() });
 
     cb?.({ success: true });
@@ -219,25 +219,30 @@ export function registerGameHandlers(io, socket) {
    * SWITCH GAME TYPE
    * ============================================================ */
   socket.on("switch_game", async ({ roomId, gameType }, cb) => {
-    if (!["tictactoe", "puzzle", "numberguess", "coopdice"].includes(gameType)) {
-      return cb?.({ success: false, message: "Invalid game type" });
+    try {
+      if (!["tictactoe", "puzzle", "numberguess", "coopdice"].includes(gameType)) {
+        return cb?.({ success: false, message: "Invalid game type" });
+      }
+
+      // Preserve players from the old game if it exists
+      const oldGame = gameManager.getGame(roomId);
+      const currentPlayers = oldGame ? oldGame.players : {};
+
+      // Force create/overwrite game
+      await gameManager.createGame(roomId, gameType);
+      const game = gameManager.getGame(roomId);
+
+      // Restore players
+      if (game) {
+        game.players = currentPlayers;
+      }
+
+      io.to(roomId).emit("game_state", { game: game.toJSON() });
+      cb?.({ success: true });
+    } catch (err) {
+      console.error("Error in switch_game:", err);
+      cb?.({ success: false, message: err.message || "Failed to switch game" });
     }
-
-    // Preserve players from the old game if it exists
-    const oldGame = gameManager.getGame(roomId);
-    const currentPlayers = oldGame ? oldGame.players : {};
-
-    // Force create/overwrite game
-    await gameManager.createGame(roomId, gameType);
-    const game = gameManager.getGame(roomId);
-
-    // Restore players
-    if (game) {
-      game.players = currentPlayers;
-    }
-
-    io.to(roomId).emit("game_state", { game: game.toJSON() });
-    cb?.({ success: true });
   });
 
 

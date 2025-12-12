@@ -44,7 +44,7 @@ export class CoopDiceGame extends BaseGame {
         const allPuzzles = [];
         const targetCount = 15;
         let attempts = 0;
-        const maxAttempts = 50; // Prevent infinite loop if API fails or is slow
+        const maxAttempts = 1000; // Prevent infinite loop if API fails or is slow
 
         while (allPuzzles.length < targetCount && attempts < maxAttempts) {
             attempts++;
@@ -71,30 +71,8 @@ export class CoopDiceGame extends BaseGame {
 
         // Fallback if we couldn't fetch enough
         if (allPuzzles.length < targetCount) {
-            const backups = [
-                { q: "I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?", a: "echo" },
-                { q: "The more of this there is, the less you see. What is it?", a: "darkness" },
-                { q: "I have keys but no locks. I have a space but no room. You can enter, but can’t go outside. What am I?", a: "keyboard" },
-                { q: "What has to be broken before you can use it?", a: "egg" },
-                { q: "I’m tall when I’m young, and I’m short when I’m old. What am I?", a: "candle" },
-                { q: "What comes once in a minute, twice in a moment, but never in a thousand years?", a: "m" },
-                { q: "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?", a: "fire" },
-                { q: "What has many keys but can't open a single lock?", a: "piano" },
-                { q: "What has a head and a tail but no body?", a: "coin" },
-                { q: "What gets wetter as it dries?", a: "towel" },
-                { q: "Math: lim(x→3) (x² - 9) / (x - 3) = ?", a: "6" },
-                { q: "Math: ∫(0 to 2) 3x² dx = ?", a: "8" },
-                { q: "Math: log₂(32) = ?", a: "5" },
-                { q: "Math: If f(x) = 2x + 1, what is f(3)?", a: "7" },
-                { q: "Math: d/dx (sin x) at x=0. (cos 0) = ?", a: "1" }
-            ];
-
-            for (const backup of backups) {
-                if (allPuzzles.length >= targetCount) break;
-                if (!allPuzzles.some(p => p.q === backup.q)) {
-                    allPuzzles.push(backup);
-                }
-            }
+            console.log(allPuzzles.length)
+            throw new Error("not able to load the puzzles");
         }
 
         const monsters = [
@@ -259,7 +237,7 @@ export class CoopDiceGame extends BaseGame {
                 this.solvePuzzle(role, answer);
                 break;
             case "reset":
-                this.reset();
+                await this.reset();
                 this.updateState({
                     board: this.state.board,
                     players: this.state.players,
